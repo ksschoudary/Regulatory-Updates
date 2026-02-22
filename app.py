@@ -5,7 +5,7 @@ import pytz
 import math
 
 # --- 1. EXECUTIVE THEME: REFINED MOSS & GOLD ---
-st.set_page_config(page_title="High-Frequency Agri-Compliance Deck", layout="wide")
+st.set_page_config(page_title="Agri-Compliance Executive Deck", layout="wide")
 
 st.markdown("""
 <style>
@@ -24,22 +24,24 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SURGICAL LOGIC: BROADENED SAFETY & BRAND POOL ---
-# Added NDTV, Zee Business, and ANI for Brand-specific safety failures and health hazards
+# --- 2. SURGICAL LOGIC: PORTAL & SAFETY LOCK ---
+# Focused on Enforcement Portals only
 SAFETY_PORTALS = "(site:fnbnews.com OR site:agrofoodprocessing.com OR site:ndtv.com OR site:zeebiz.com OR site:aninews.in OR site:republicworld.com OR site:inshorts.com)"
 
-# Added 'sample fail', 'hazardous', 'presence', 'restaurant', 'chains'
-REG_KEYWORDS = "(FSSAI OR 'sample fail' OR hazardous OR presence OR UPFSDA OR crackdown OR seizure OR raid OR inspection OR purity OR flags OR 'safety test' OR restaurant OR chains OR ban)"
+# ENFORCEMENT KEYWORDS ONLY (Added brands/hazardous/fail)
+REG_KEYWORDS = "(FSSAI OR 'sample fail' OR hazardous OR 'Nitrofurans' OR crackdown OR seizure OR raid OR inspection OR purity OR adulteration OR 'restaurant chains' OR ban)"
 
-MACRO_BLOCKER = "-rupee -spike -imports -volume -price -market -trade -atmanirbhar -economy -stocks -sensex -nifty"
+# STERN BLOCKLIST: Removes Price/Market AND AI/Innovation noise
+STRICT_BLOCKER = "-rupee -imports -volume -price -market -trade -atmanirbhar -economy -stocks -sensex -nifty -AI -Innovation -Digital -Startup -Software"
 
 @st.cache_data(ttl=60)
 def fetch_ultra_fresh_intel(query, limit=150):
     try:
-        full_query = f"{query} {MACRO_BLOCKER} location:India"
+        full_query = f"{query} {STRICT_BLOCKER} location:India"
         url = f"https://news.google.com/rss/search?q={full_query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en&tbs=qdr:m6"
         feed = feedparser.parse(url)
-        filtered = [e for e in feed.entries if not any(x in e.title.lower() for x in ["price", "market", "trade", "import", "rupee"])]
+        # Final safety filter to ensure no AI or Trade news survived
+        filtered = [e for e in feed.entries if not any(x in e.title.lower() for x in ["price", "market", "ai", "innovation", "startup"])]
         return sorted(filtered, key=lambda x: x.published_parsed, reverse=True)[:limit]
     except: return []
 
@@ -66,11 +68,11 @@ with h_col2:
 st.write("---")
 
 # --- 4. DATA ACQUISITION ---
-# LEFT SIDE: FSSAI Official Advisories & Orders
+# LEFT SIDE: Deep Scan of FSSAI Website for all Agri/Food Advisories
 left_query = "site:fssai.gov.in (Agri OR Food OR Standards OR Advisory OR Gazette OR Order OR Notification OR Laboratory OR Sampling OR 'Section 16')"
 vault_data = fetch_ultra_fresh_intel(left_query)
 
-# RIGHT SIDE: Safety Portals (NDTV, ZeeBiz, ANI) + Enforcement Alerts
+# RIGHT SIDE: Portal-Specific Intelligence (FNB/Zee/NDTV) + Enforcement
 right_query = f"{SAFETY_PORTALS} {REG_KEYWORDS}"
 intel_data = [e for e in fetch_ultra_fresh_intel(right_query) if "fssai.gov.in" not in e.link]
 
@@ -93,12 +95,12 @@ with col1:
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
 with col2:
-    st.markdown("<h3 class='section-header'>⚖️ SAFETY & BRAND INTEL</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 class='section-header'>⚖️ SAFETY & ENFORCEMENT INTEL</h3>", unsafe_allow_html=True)
     for e in intel_data[start:end]:
         dt = datetime(*e.published_parsed[:6])
         label, is_hot = format_freshness_detailed(dt)
         fresh_tag = "<span class='fresh-tag'>HOT</span>" if is_hot else ""
-        st.markdown(f"""<div class='bento-card'><div class='meta-line'>INTEL | {dt.strftime('%d %b %Y')} | {label} {fresh_tag}</div>
+        st.markdown(f"""<div class='bento-card'><div class='meta-line'>ACTION | {dt.strftime('%d %b %Y')} | {label} {fresh_tag}</div>
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
 # Page Control
