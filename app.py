@@ -24,12 +24,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SURGICAL LOGIC: EXPANDED ENFORCEMENT PORTALS ---
-# Added Inshorts, Republic, and ANI for high-impact enforcement news
-ENFORCEMENT_PORTALS = "(site:fnbnews.com OR site:agrofoodprocessing.com OR site:republicworld.com OR site:inshorts.com OR site:aninews.in OR site:timesofindia.indiatimes.com)"
+# --- 2. SURGICAL LOGIC: BROADENED SAFETY & BRAND POOL ---
+# Added NDTV, Zee Business, and ANI for Brand-specific safety failures and health hazards
+SAFETY_PORTALS = "(site:fnbnews.com OR site:agrofoodprocessing.com OR site:ndtv.com OR site:zeebiz.com OR site:aninews.in OR site:republicworld.com OR site:inshorts.com)"
 
-# Added 'crackdown', 'massive', 'UPFSDA', 'seized', 'raid' for high-impact alerts
-REG_KEYWORDS = "(FSSAI OR 'FSSAI CEO' OR UPFSDA OR 'food safety' OR crackdown OR massive OR seizure OR raid OR inspection OR purity OR flags OR 'safety test' OR campaign OR ban OR labelling)"
+# Added 'sample fail', 'hazardous', 'presence', 'restaurant', 'chains'
+REG_KEYWORDS = "(FSSAI OR 'sample fail' OR hazardous OR presence OR UPFSDA OR crackdown OR seizure OR raid OR inspection OR purity OR flags OR 'safety test' OR restaurant OR chains OR ban)"
 
 MACRO_BLOCKER = "-rupee -spike -imports -volume -price -market -trade -atmanirbhar -economy -stocks -sensex -nifty"
 
@@ -66,12 +66,12 @@ with h_col2:
 st.write("---")
 
 # --- 4. DATA ACQUISITION ---
-# LEFT SIDE: FSSAI Official Advisories
-left_query = "site:fssai.gov.in (Agri OR Food OR Product OR Standards OR Advisory OR Gazette OR Order OR Notification OR Laboratory OR Sampling OR 'Section 16')"
+# LEFT SIDE: FSSAI Official Advisories & Orders
+left_query = "site:fssai.gov.in (Agri OR Food OR Standards OR Advisory OR Gazette OR Order OR Notification OR Laboratory OR Sampling OR 'Section 16')"
 vault_data = fetch_ultra_fresh_intel(left_query)
 
-# RIGHT SIDE: Industry Portals + Enforcement Alerts (Republic/Inshorts/ANI)
-right_query = f"{ENFORCEMENT_PORTALS} {REG_KEYWORDS}"
+# RIGHT SIDE: Safety Portals (NDTV, ZeeBiz, ANI) + Enforcement Alerts
+right_query = f"{SAFETY_PORTALS} {REG_KEYWORDS}"
 intel_data = [e for e in fetch_ultra_fresh_intel(right_query) if "fssai.gov.in" not in e.link]
 
 # --- 5. RENDER (PAGINATION: 75) ---
@@ -84,7 +84,7 @@ start, end = (st.session_state.page - 1) * PAGE_SIZE, st.session_state.page * PA
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("<h3 class='section-header'>🏛️ FSSAI OFFICIAL ADVISORIES</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 class='section-header'>🏛️ FSSAI OFFICIAL VAULT</h3>", unsafe_allow_html=True)
     for e in vault_data[start:end]:
         dt = datetime(*e.published_parsed[:6])
         label, is_hot = format_freshness_detailed(dt)
@@ -93,7 +93,7 @@ with col1:
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
 with col2:
-    st.markdown("<h3 class='section-header'>⚖️ ENFORCEMENT & SAFETY INTEL</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 class='section-header'>⚖️ SAFETY & BRAND INTEL</h3>", unsafe_allow_html=True)
     for e in intel_data[start:end]:
         dt = datetime(*e.published_parsed[:6])
         label, is_hot = format_freshness_detailed(dt)
