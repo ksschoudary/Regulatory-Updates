@@ -5,7 +5,7 @@ import pytz
 import math
 
 # --- 1. EXECUTIVE THEME: REFINED MOSS & GOLD ---
-st.set_page_config(page_title="High-Frequency Agri-Compliance Deck", layout="wide")
+st.set_page_config(page_title="Regulatory Information Centre", layout="wide")
 
 st.markdown("""
 <style>
@@ -24,22 +24,23 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SURGICAL LOGIC: EXPANDED ENFORCEMENT PORTALS ---
-# Added Inshorts, Republic, and ANI for high-impact enforcement news
-ENFORCEMENT_PORTALS = "(site:fnbnews.com OR site:agrofoodprocessing.com OR site:republicworld.com OR site:inshorts.com OR site:aninews.in OR site:timesofindia.indiatimes.com)"
+# --- 2. SURGICAL LOGIC: ENFORCEMENT & SAFETY ONLY ---
+ENFORCEMENT_PORTALS = "(site:fnbnews.com OR site:agrofoodprocessing.com OR site:republicworld.com OR site:inshorts.com OR site:aninews.in OR site:timesofindia.indiatimes.com OR site:ndtv.com OR site:zeebiz.com)"
 
-# Added 'crackdown', 'massive', 'UPFSDA', 'seized', 'raid' for high-impact alerts
-REG_KEYWORDS = "(FSSAI OR 'FSSAI CEO' OR UPFSDA OR 'food safety' OR crackdown OR massive OR seizure OR raid OR inspection OR purity OR flags OR 'safety test' OR campaign OR ban OR labelling)"
+# ENFORCEMENT KEYWORDS (Locked to Brands, Crackdowns, and Hazards)
+REG_KEYWORDS = "(FSSAI OR 'FSSAI CEO' OR UPFSDA OR 'food safety' OR crackdown OR massive OR seizure OR raid OR 'sample fail' OR purity OR 'Nitrofurans' OR hazardous OR 'restaurant chains')"
 
-MACRO_BLOCKER = "-rupee -spike -imports -volume -price -market -trade -atmanirbhar -economy -stocks -sensex -nifty"
+# STERN BLOCKLIST: Removes Price/Macro AND AI/Innovation fluff
+STRICT_BLOCKER = "-rupee -imports -volume -price -market -trade -atmanirbhar -economy -stocks -sensex -nifty -AI -Innovation -Digital -Startup -Software"
 
 @st.cache_data(ttl=60)
 def fetch_ultra_fresh_intel(query, limit=150):
     try:
-        full_query = f"{query} {MACRO_BLOCKER} location:India"
+        full_query = f"{query} {STRICT_BLOCKER} location:India"
         url = f"https://news.google.com/rss/search?q={full_query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en&tbs=qdr:m6"
         feed = feedparser.parse(url)
-        filtered = [e for e in feed.entries if not any(x in e.title.lower() for x in ["price", "market", "trade", "import", "rupee"])]
+        # Double-pass filter to ensure zero price or tech news survived
+        filtered = [e for e in feed.entries if not any(x in e.title.lower() for x in ["price", "market", "trade", "import", "ai", "innovation"])]
         return sorted(filtered, key=lambda x: x.published_parsed, reverse=True)[:limit]
     except: return []
 
@@ -57,20 +58,20 @@ last_sync = datetime.now(ist).strftime('%d %b %Y | %I:%M %p IST')
 
 h_col1, h_col2 = st.columns([3, 1])
 with h_col1:
-    st.markdown("<h2 style='color:#d4af37; margin:0;'>🛡️ AGRI-QUALITY COMMAND CENTER</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:#d4af37; margin:0;'>🛡️ REGULATORY INFORMATION CENTRE</h2>", unsafe_allow_html=True)
 with h_col2:
-    st.markdown(f"<div class='sync-text'>Live Sync: {last_sync}</div>", unsafe_allow_html=True)
-    if st.button("🚀 Emergency Force Refresh"):
+    st.markdown(f"<div class='sync-text'>Sync: {last_sync}</div>", unsafe_allow_html=True)
+    if st.button("🚀 Force Refresh Feed"):
         st.cache_data.clear()
         st.rerun()
 st.write("---")
 
 # --- 4. DATA ACQUISITION ---
-# LEFT SIDE: FSSAI Official Advisories
-left_query = "site:fssai.gov.in (Agri OR Food OR Product OR Standards OR Advisory OR Gazette OR Order OR Notification OR Laboratory OR Sampling OR 'Section 16')"
+# LEFT SIDE: Deep Scan of FSSAI Website for all Agri/Food Advisories
+left_query = "site:fssai.gov.in (Agri OR Food OR Standards OR Advisory OR Gazette OR Order OR Notification OR Laboratory OR Sampling OR 'Section 16')"
 vault_data = fetch_ultra_fresh_intel(left_query)
 
-# RIGHT SIDE: Industry Portals + Enforcement Alerts (Republic/Inshorts/ANI)
+# RIGHT SIDE: Portal-Specific Intelligence + Enforcement Alerts + Brand Watch
 right_query = f"{ENFORCEMENT_PORTALS} {REG_KEYWORDS}"
 intel_data = [e for e in fetch_ultra_fresh_intel(right_query) if "fssai.gov.in" not in e.link]
 
@@ -84,7 +85,7 @@ start, end = (st.session_state.page - 1) * PAGE_SIZE, st.session_state.page * PA
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("<h3 class='section-header'>🏛️ FSSAI OFFICIAL ADVISORIES</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 class='section-header'>🏛️ FSSAI OFFICIAL VAULT</h3>", unsafe_allow_html=True)
     for e in vault_data[start:end]:
         dt = datetime(*e.published_parsed[:6])
         label, is_hot = format_freshness_detailed(dt)
@@ -93,12 +94,12 @@ with col1:
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
 with col2:
-    st.markdown("<h3 class='section-header'>⚖️ ENFORCEMENT & SAFETY INTEL</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 class='section-header'>⚖️ SAFETY & ENFORCEMENT INTEL</h3>", unsafe_allow_html=True)
     for e in intel_data[start:end]:
         dt = datetime(*e.published_parsed[:6])
         label, is_hot = format_freshness_detailed(dt)
         fresh_tag = "<span class='fresh-tag'>HOT</span>" if is_hot else ""
-        st.markdown(f"""<div class='bento-card'><div class='meta-line'>INTEL | {dt.strftime('%d %b %Y')} | {label} {fresh_tag}</div>
+        st.markdown(f"""<div class='bento-card'><div class='meta-line'>ACTION | {dt.strftime('%d %b %Y')} | {label} {fresh_tag}</div>
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
 # Page Control
