@@ -11,19 +11,22 @@ st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap');
     html, body, [class*="css"], .stMarkdown, p, div, h1, h2, h3, h4, h5, h6 { font-family: 'EB Garamond', serif !important; }
+    
     .stApp { background-color: #1a2421; color: #fdfae1; }
+    
     .bento-card { 
-        background-color: #26322e; border-radius: 4px; padding: 15px; 
+        background-color: #26322e; border-radius: 4px; padding: 16px; 
         border: 1px solid #d4af37; margin-bottom: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     }
-    .headline-link { text-decoration: none; color: #ffffff !important; font-size: 16.5px; font-weight: 600; }
-    .meta-line { color: #d4af37; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 5px; letter-spacing: 1px; }
+    .headline-link { text-decoration: none; color: #ffffff !important; font-size: 17px; font-weight: 600; line-height: 1.3; }
+    .meta-line { color: #d4af37; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 1.5px; }
     .section-header { border-bottom: 3px solid #d4af37; color: #d4af37; text-align: center; text-transform: uppercase; letter-spacing: 2px; padding-bottom: 10px; }
     .sync-text { font-size: 14px; color: #d4af37; font-weight: 600; text-align: right; }
+    .stButton>button { background-color: #d4af37; color: #1a2421; font-weight: 700; border: none; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SURGICAL DATA ENGINE: 28 COMMODITIES & NO PRICE NOISE ---
+# --- 2. SURGICAL LOGIC: 28 COMMODITIES & STRICT REGULATORY LOCK ---
 COMMODITIES = [
     "Milk", "Paneer", "Ghee", "Khoya", "Edible Oil", "Mustard Oil", "Chana", "Wheat", "Sugar",
     "Maize", "Spices", "Chilli", "Turmeric", "Cashew", "Isabgol", "Rice Bran Oil",
@@ -31,19 +34,19 @@ COMMODITIES = [
 ]
 COMM_STR = " OR ".join([f"'{c}'" for c in COMMODITIES])
 
-# FORCE focus on safety/enforcement; EXCLUDE all market/price noise
+# FORCE focus on safety/enforcement; EXCLUDE all trade/price noise
 ENFORCEMENT_ONLY = "(seized OR raid OR crackdown OR confiscated OR fake OR 'safety test' OR adulteration OR misbranding OR 'Section 16' OR FoSCoS OR surveillance)"
 STRICT_BLOCKER = "-rupee -imports -volume -price -trillion -crore -exchange -market -trade -atmanirbhar -economy -stocks -sensex -nifty"
 
 @st.cache_data(ttl=600)
-def fetch_enforcement_intel(query, limit=150):
+def fetch_surgical_intel(query, limit=150):
     try:
         # location:India ensures regional focus
         full_query = f"{query} {STRICT_BLOCKER} location:India"
         url = f"https://news.google.com/rss/search?q={full_query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en&tbs=qdr:m6"
         feed = feedparser.parse(url)
-        # Double-pass manual filter to ensure zero price/market news slips through
-        filtered = [e for e in feed.entries if not any(x in e.title.lower() for x in ["price", "market", "import", "rupee", "stock"])]
+        # Double-check: Manual filter to kill any straggling trade/price news
+        filtered = [e for e in feed.entries if not any(x in e.title.lower() for x in ["price", "market", "import", "rupee", "stock", "trade"])]
         return sorted(filtered, key=lambda x: x.published_parsed, reverse=True)[:limit]
     except: return []
 
@@ -51,9 +54,10 @@ def get_freshness_label(pub_date):
     diff = datetime.utcnow() - pub_date
     if diff.days > 0: return f"{diff.days} days ago"
     hours = diff.seconds // 3600
-    return f"{hours} hrs ago" if hours > 0 else f"{(diff.seconds // 60) % 60} mins ago"
+    if hours > 0: return f"{hours} hrs ago"
+    return f"{(diff.seconds // 60) % 60} mins ago"
 
-# --- 3. HEADER & TIME-SYNC ---
+# --- 3. PERSISTENT HEADER ---
 ist_tz = pytz.timezone('Asia/Kolkata')
 last_sync = datetime.now(ist_tz).strftime('%d %b %Y | %I:%M %p IST')
 
@@ -61,19 +65,19 @@ h_col1, h_col2 = st.columns([3, 1])
 with h_col1:
     st.markdown("<h2 style='color:#d4af37; margin:0;'>🛡️ AGRI-COMPLIANCE COMMAND CENTER</h2>", unsafe_allow_html=True)
 with h_col2:
-    st.markdown(f"<div class='sync-text'>Sync: {last_sync}</div>", unsafe_allow_html=True)
-    if st.button("🔄 Refresh Enforcement Feed"):
+    st.markdown(f"<div class='sync-text'>Live Sync: {last_sync}</div>", unsafe_allow_html=True)
+    if st.button("🔄 Force Refresh Data"):
         st.cache_data.clear()
         st.rerun()
 st.write("---")
 
 # --- 4. DATA ACQUISITION ---
-# LEFT: Official Vault (Direct FSSAI Orders)
-vault_data = fetch_enforcement_intel(f"site:fssai.gov.in ({COMM_STR}) ({ENFORCEMENT_ONLY} OR circular OR sampling)")
-# RIGHT: Enforcement News (Raids & Crackdowns)
-intel_data = [e for e in fetch_enforcement_intel(f"({COMM_STR}) ({ENFORCEMENT_ONLY})") if "fssai.gov.in" not in e.link]
+# LEFT: Official Vault (Direct FSSAI orders for inspections/sampling)
+vault_data = fetch_surgical_intel(f"site:fssai.gov.in ({COMM_STR}) ({ENFORCEMENT_ONLY} OR circular OR sampling)")
+# RIGHT: Enforcement News (Raids, Sampling drives, Adulteration prevention)
+intel_data = [e for e in fetch_surgical_intel(f"({COMM_STR}) ({ENFORCEMENT_ONLY})") if "fssai.gov.in" not in e.link]
 
-# --- 5. RENDER (PAGINATION: 75) ---
+# --- 5. RENDER & PAGINATION (75) ---
 PAGE_SIZE = 75
 if 'page' not in st.session_state: st.session_state.page = 1
 total_max = max(len(vault_data), len(intel_data))
