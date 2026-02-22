@@ -24,13 +24,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SURGICAL LOGIC: EXPANDED ENFORCEMENT PORTALS ---
-# Added Inshorts, Republic, and ANI for high-impact enforcement news
+# --- 2. SURGICAL LOGIC: PORTALS & KEYWORDS ---
 ENFORCEMENT_PORTALS = "(site:fnbnews.com OR site:agrofoodprocessing.com OR site:republicworld.com OR site:inshorts.com OR site:aninews.in OR site:timesofindia.indiatimes.com)"
-
-# Added 'crackdown', 'massive', 'UPFSDA', 'seized', 'raid' for high-impact alerts
 REG_KEYWORDS = "(FSSAI OR 'FSSAI CEO' OR UPFSDA OR 'food safety' OR crackdown OR massive OR seizure OR raid OR inspection OR purity OR flags OR 'safety test' OR campaign OR ban OR labelling)"
-
 MACRO_BLOCKER = "-rupee -spike -imports -volume -price -market -trade -atmanirbhar -economy -stocks -sensex -nifty"
 
 @st.cache_data(ttl=60)
@@ -39,6 +35,7 @@ def fetch_ultra_fresh_intel(query, limit=150):
         full_query = f"{query} {MACRO_BLOCKER} location:India"
         url = f"https://news.google.com/rss/search?q={full_query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en&tbs=qdr:m6"
         feed = feedparser.parse(url)
+        # Maintaining the filtering logic exactly
         filtered = [e for e in feed.entries if not any(x in e.title.lower() for x in ["price", "market", "trade", "import", "rupee"])]
         return sorted(feed.entries, key=lambda x: x.published_parsed, reverse=True)[:limit]
     except: return []
@@ -66,15 +63,15 @@ with h_col2:
 st.write("---")
 
 # --- 4. DATA ACQUISITION ---
-# LEFT SIDE: FSSAI Official Advisories
-left_query = "site:fssai.gov.in (Agri OR Food OR Product OR Standards OR Advisory OR Gazette OR Order OR Notification OR Laboratory OR Sampling OR 'Section 16')"
-vault_data = fetch_ultra_fresh_intel(left_query)
+# Vault Query (now destined for the right side)
+left_query_vault = "site:fssai.gov.in (Agri OR Food OR Product OR Standards OR Advisory OR Gazette OR Order OR Notification OR Laboratory OR Sampling OR 'Section 16')"
+vault_data = fetch_ultra_fresh_intel(left_query_vault)
 
-# RIGHT SIDE: Industry Portals + Enforcement Alerts (Republic/Inshorts/ANI)
-right_query = f"{ENFORCEMENT_PORTALS} {REG_KEYWORDS}"
-intel_data = [e for e in fetch_ultra_fresh_intel(right_query) if "fssai.gov.in" not in e.link]
+# Intel Query (now destined for the left side)
+right_query_intel = f"{ENFORCEMENT_PORTALS} {REG_KEYWORDS}"
+intel_data = [e for e in fetch_ultra_fresh_intel(right_query_intel) if "fssai.gov.in" not in e.link]
 
-# --- 5. RENDER (PAGINATION: 75) ---
+# --- 5. RENDER (SWAPPED COLUMNS) ---
 PAGE_SIZE = 75
 if 'page' not in st.session_state: st.session_state.page = 1
 total_max = max(len(vault_data), len(intel_data))
@@ -84,21 +81,21 @@ start, end = (st.session_state.page - 1) * PAGE_SIZE, st.session_state.page * PA
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("<h3 class='section-header'>🏛️ FSSAI OFFICIAL ADVISORIES</h3>", unsafe_allow_html=True)
-    for e in vault_data[start:end]:
-        dt = datetime(*e.published_parsed[:6])
-        label, is_hot = format_freshness_detailed(dt)
-        fresh_tag = "<span class='fresh-tag'>HOT</span>" if is_hot else ""
-        st.markdown(f"""<div class='bento-card'><div class='meta-line'>OFFICIAL | {dt.strftime('%d %b %Y')} | {label} {fresh_tag}</div>
-        <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
-
-with col2:
     st.markdown("<h3 class='section-header'>⚖️ ENFORCEMENT & SAFETY INTEL</h3>", unsafe_allow_html=True)
     for e in intel_data[start:end]:
         dt = datetime(*e.published_parsed[:6])
         label, is_hot = format_freshness_detailed(dt)
         fresh_tag = "<span class='fresh-tag'>HOT</span>" if is_hot else ""
         st.markdown(f"""<div class='bento-card'><div class='meta-line'>INTEL | {dt.strftime('%d %b %Y')} | {label} {fresh_tag}</div>
+        <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
+
+with col2:
+    st.markdown("<h3 class='section-header'>🏛️ FSSAI OFFICIAL ADVISORIES</h3>", unsafe_allow_html=True)
+    for e in vault_data[start:end]:
+        dt = datetime(*e.published_parsed[:6])
+        label, is_hot = format_freshness_detailed(dt)
+        fresh_tag = "<span class='fresh-tag'>HOT</span>" if is_hot else ""
+        st.markdown(f"""<div class='bento-card'><div class='meta-line'>OFFICIAL | {dt.strftime('%d %b %Y')} | {label} {fresh_tag}</div>
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
 # Page Control
