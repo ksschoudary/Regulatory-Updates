@@ -24,25 +24,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SURGICAL LOGIC: RECENT PULSE LOCK ---
-INDUSTRY_PORTALS = "(site:fnbnews.com OR site:agrofoodprocessing.com OR site:foodnavigator-asia.com)"
-REG_KEYWORDS = "(FSSAI OR 'FSSAI CEO' OR 'food safety' OR enforcement OR inspection OR review OR campaign OR obesity OR healthy OR 'Front-of-Pack Label' OR ban OR labelling OR measures OR efforts)"
-MACRO_BLOCKER = "-rupee -imports -volume -price -market -trade -atmanirbhar -economy -stocks -sensex -nifty"
+# --- 2. SURGICAL LOGIC: PORTAL & CONSUMER SAFETY LOCK ---
+INDUSTRY_PORTALS = "(site:fnbnews.com OR site:agrofoodprocessing.com OR site:foodnavigator-asia.com OR site:timesofindia.indiatimes.com)"
+# Added 'flags', 'purity', 'test', 'ways to' to capture the TOI-style consumer alert news
+REG_KEYWORDS = "(FSSAI OR 'FSSAI CEO' OR 'food safety' OR enforcement OR inspection OR purity OR flags OR 'safety test' OR campaign OR obesity OR healthy OR 'Front-of-Pack Label' OR ban OR labelling OR measures)"
+MACRO_BLOCKER = "-rupee -spike -imports -volume -price -market -trade -atmanirbhar -economy -stocks -sensex -nifty"
 
-@st.cache_data(ttl=60) # Reduced to 60 seconds for ultra-freshness
+@st.cache_data(ttl=60)
 def fetch_ultra_fresh_intel(query, limit=150):
     try:
-        # tbs=qdr:d ensures we prioritize the last 24 hours of activity
         full_query = f"{query} {MACRO_BLOCKER} location:India"
-        url = f"https://news.google.com/rss/search?q={full_query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en&tbs=qdr:d"
+        url = f"https://news.google.com/rss/search?q={full_query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en&tbs=qdr:m6"
         feed = feedparser.parse(url)
-        
-        # If 24h results are low, fall back to m6 (last 6 months) to ensure the 75-item page is full
-        if len(feed.entries) < 10:
-            url = f"https://news.google.com/rss/search?q={full_query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en&tbs=qdr:m6"
-            feed = feedparser.parse(url)
-            
-        filtered = [e for e in feed.entries if not any(x in e.title.lower() for x in ["price", "market", "trade", "import"])]
+        # Sort by latest and strip macro news
+        filtered = [e for e in feed.entries if not any(x in e.title.lower() for x in ["price", "market", "trade", "import", "rupee"])]
         return sorted(filtered, key=lambda x: x.published_parsed, reverse=True)[:limit]
     except: return []
 
@@ -69,11 +64,11 @@ with h_col2:
 st.write("---")
 
 # --- 4. DATA ACQUISITION ---
-# LEFT SIDE: Deep Scan of FSSAI Website for all Agri/Food Advisories
+# LEFT SIDE: FSSAI Website Advisories
 left_query = "site:fssai.gov.in (Agri OR Food OR Product OR Standards OR Advisory OR Gazette OR Order OR Notification OR Laboratory OR Sampling OR 'Section 16')"
 vault_data = fetch_ultra_fresh_intel(left_query)
 
-# RIGHT SIDE: Portal-Specific Intelligence (FnB News / Agrofood Processing)
+# RIGHT SIDE: Industry Portals + TOI Safety News
 right_query = f"{INDUSTRY_PORTALS} {REG_KEYWORDS}"
 intel_data = [e for e in fetch_ultra_fresh_intel(right_query) if "fssai.gov.in" not in e.link]
 
@@ -96,12 +91,12 @@ with col1:
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
 with col2:
-    st.markdown("<h3 class='section-header'>⚖️ INDUSTRY & ENFORCEMENT INTEL</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 class='section-header'>⚖️ INDUSTRY & SAFETY INTEL</h3>", unsafe_allow_html=True)
     for e in intel_data[start:end]:
         dt = datetime(*e.published_parsed[:6])
         label, is_hot = format_freshness_detailed(dt)
         fresh_tag = "<span class='fresh-tag'>HOT</span>" if is_hot else ""
-        st.markdown(f"""<div class='bento-card'><div class='meta-line'>CAMPAIGN | {dt.strftime('%d %b %Y')} | {label} {fresh_tag}</div>
+        st.markdown(f"""<div class='bento-card'><div class='meta-line'>INTEL | {dt.strftime('%d %b %Y')} | {label} {fresh_tag}</div>
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
 # Page Control
