@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import pytz
 import math
 
-# --- 1. THE EXECUTIVE THEME: REFINED MOSS & GOLD ---
+# --- 1. EXECUTIVE THEME: REFINED MOSS & GOLD ---
 st.set_page_config(page_title="Agri-Compliance Command Center", layout="wide")
 
 st.markdown("""
@@ -24,29 +24,24 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SURGICAL LOGIC: DEEP SCAN ARRAYS ---
-COMMODITIES = [
-    "Milk", "Paneer", "Ghee", "Khoya", "Edible Oil", "Mustard Oil", "Chana", "Wheat", "Sugar",
-    "Maize", "Spices", "Chilli", "Turmeric", "Cashew", "Isabgol", "Rice", "Paddy", "Pulses",
-    "Soyabean", "Sunflower", "Almond", "Raisins", "Oats", "Cocoa", "Cardamom", "Pepper"
-]
-# AGRI-SCAN KEYWORDS for Left Side
-AGRI_SCAN = "(Agri OR Food OR Product OR Standards OR Advisory OR Gazette OR Order OR Notification OR Laboratory OR Sampling OR 'Section 16')"
+# --- 2. SURGICAL LOGIC: PORTAL & KEYWORD LOCK ---
+# Industry-specific portals for the Right Side
+INDUSTRY_PORTALS = "(site:fnbnews.com OR site:agrofoodprocessing.com OR site:foodnavigator-asia.com)"
 
-# ENFORCEMENT KEYWORDS for Right Side
-ENFORCEMENT_ONLY = "(seized OR raid OR crackdown OR confiscated OR fake OR adulteration OR misbranding OR enforcement)"
+# High-impact regulatory keywords
+REG_KEYWORDS = "(FSSAI OR 'FSSAI CEO' OR 'food safety' OR enforcement OR inspection OR review OR campaign OR obesity OR healthy OR 'Front-of-Pack Label' OR ban OR labelling OR measures OR efforts)"
 
-# STERN BLOCKLIST: Removes trade/price/macro noise
-MACRO_BLOCKER = "-rupee -imports -volume -price -trillion -crore -market -trade -atmanirbhar -economy -stocks -sensex"
+# Mandatory Blocklist for Price/Market noise
+NOISE_BLOCKER = "-rupee -spike -imports -volume -price -market -trade -atmanirbhar -economy -stocks -sensex -nifty"
 
 @st.cache_data(ttl=600)
-def fetch_surgical_intel(query, limit=150):
+def fetch_compliance_intel(query, limit=150):
     try:
-        # location:India ensures regional relevance
-        full_query = f"{query} {MACRO_BLOCKER} location:India"
+        # Strictly India-focused surgical search
+        full_query = f"{query} {NOISE_BLOCKER} location:India"
         url = f"https://news.google.com/rss/search?q={full_query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en&tbs=qdr:m6"
         feed = feedparser.parse(url)
-        # Final safety filter to ensure zero price/market news
+        # Secondary logic check to kill any lingering macro-news
         filtered = [e for e in feed.entries if not any(x in e.title.lower() for x in ["price", "market", "import", "trade", "stock"])]
         return sorted(filtered, key=lambda x: x.published_parsed, reverse=True)[:limit]
     except: return []
@@ -64,7 +59,7 @@ last_sync = datetime.now(ist).strftime('%d %b %Y | %I:%M %p IST')
 
 h_col1, h_col2 = st.columns([3, 1])
 with h_col1:
-    st.markdown("<h2 style='color:#d4af37; margin:0;'>🛡️ AGRI-COMPLIANCE COMMAND CENTER</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='color:#d4af37; margin:0;'>🛡️ AGRI-QUALITY COMMAND CENTER</h2>", unsafe_allow_html=True)
 with h_col2:
     st.markdown(f"<div class='sync-text'>Sync: {last_sync}</div>", unsafe_allow_html=True)
     if st.button("🔄 Force Refresh Data"):
@@ -74,13 +69,13 @@ st.write("---")
 
 # --- 4. DATA ACQUISITION ---
 # LEFT SIDE: Deep Scan of FSSAI Website for all Agri/Food Advisories
-left_query = f"site:fssai.gov.in {AGRI_SCAN}"
-vault_data = fetch_surgical_intel(left_query)
+left_query = "site:fssai.gov.in (Agri OR Food OR Product OR Standards OR Advisory OR Gazette OR Order OR Notification OR Laboratory OR Sampling OR 'Section 16')"
+vault_data = fetch_compliance_intel(left_query)
 
-# RIGHT SIDE: Field Enforcement News
-comm_str = " OR ".join([f"'{c}'" for c in COMMODITIES])
-right_query = f"({comm_str}) ({ENFORCEMENT_ONLY})"
-intel_data = [e for e in fetch_surgical_intel(right_query) if "fssai.gov.in" not in e.link]
+# RIGHT SIDE: Portal-Specific Intelligence (FnB News / Agrofood Processing)
+# Hunting for CEO directives, Campaigns, and Labeling Bans
+right_query = f"{INDUSTRY_PORTALS} {REG_KEYWORDS}"
+intel_data = [e for e in fetch_compliance_intel(right_query) if "fssai.gov.in" not in e.link]
 
 # --- 5. RENDER (PAGINATION: 75) ---
 PAGE_SIZE = 75
@@ -99,10 +94,10 @@ with col1:
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
 with col2:
-    st.markdown("<h3 class='section-header'>⚖️ RAIDS & ENFORCEMENT INTEL</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 class='section-header'>⚖️ INDUSTRY & ENFORCEMENT INTEL</h3>", unsafe_allow_html=True)
     for e in intel_data[start:end]:
         dt = datetime(*e.published_parsed[:6])
-        st.markdown(f"""<div class='bento-card'><div class='meta-line'>ACTION | {dt.strftime('%d %b %Y')} | {format_freshness(dt)}</div>
+        st.markdown(f"""<div class='bento-card'><div class='meta-line'>CAMPAIGN | {dt.strftime('%d %b %Y')} | {format_freshness(dt)}</div>
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
 # Page Control
