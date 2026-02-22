@@ -3,98 +3,118 @@ import feedparser
 from datetime import datetime, timedelta
 import math
 
-# --- 1. EXECUTIVE THEME (MOSS & GOLD) ---
-st.set_page_config(page_title="Food Safety Enforcement Deck", layout="wide")
+# --- 1. EXECUTIVE THEME: MOSS & GOLD ---
+st.set_page_config(page_title="Agri-Regulatory Command Center", layout="wide")
 
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap');
+    
     html, body, [class*="css"], .stMarkdown, p, div, h1, h2, h3, h4, h5, h6 { 
         font-family: 'EB Garamond', serif !important; 
     }
+    
+    /* Background: Deep Moss Green */
     .stApp { background-color: #1a2421; color: #f1f3f2; }
+    
+    /* Cards: Sage with Gold Accents */
     .bento-card { 
-        background-color: #26322e; border-radius: 4px; padding: 14px; 
-        border: 1px solid #c5a059; margin-bottom: 10px;
+        background-color: #26322e; border-radius: 4px; padding: 16px; 
+        border: 1px solid #c5a059; margin-bottom: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.4);
     }
-    .headline-link { text-decoration: none; color: #e9ecef !important; font-size: 16px; font-weight: 600; }
-    .meta-line { color: #d4af37; font-size: 10.5px; font-weight: 700; text-transform: uppercase; margin-bottom: 4px; letter-spacing: 1px; }
-    .section-header { border-bottom: 2px solid #c5a059; color: #c5a059; text-align: center; text-transform: uppercase; padding-bottom: 5px; }
-    .stButton>button { background-color: #26322e; color: #c5a059; border: 1px solid #c5a059; width: 100%; }
+    
+    .headline-link { text-decoration: none; color: #f8fafc !important; font-size: 17px; font-weight: 600; }
+    
+    /* Metadata: Executive Gold */
+    .meta-line { 
+        color: #d4af37; font-size: 11px; font-weight: 700; 
+        text-transform: uppercase; margin-bottom: 6px; letter-spacing: 1px;
+    }
+    
+    .section-header {
+        border-bottom: 2px solid #c5a059; padding-bottom: 10px;
+        color: #c5a059; text-align: center; text-transform: uppercase; letter-spacing: 2px;
+    }
+    
+    .stButton>button { background-color: #c5a059; color: #1a2421; font-weight: 700; border: none; width: 100%; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SURGICAL SEARCH PARAMETERS ---
-COMMODITIES = ["Wheat", "Chana", "Maize", "Cashew", "Isabgol", "Edible Oil", "Milk", "Rice", "Sugar", "Spices"]
+# --- 2. SURGICAL DATA ENGINE ---
+COMMODITIES = ["Wheat", "Chana", "Maize", "Cashew", "Isabgol", "Edible Oil", "Milk", "Rice", "Sugar", "Spices", "Pulses"]
 COMM_STR = " OR ".join([f"'{c}'" for c in COMMODITIES])
 
-# These keywords maximize reach for "Inspection & Prevention"
-ENFORCEMENT_KEYWORDS = "inspection prevention sampling audit 'quality check' surveillance 'adulteration drive' 'sampling system'"
-
-@st.cache_data(ttl=600)
-def fetch_enforcement_data(query, limit=200):
+@st.cache_data(ttl=300)
+def fetch_surgical_data(query, time_range="m6", limit=150):
     try:
-        # Looking back 180 days (m6) for maximum context
-        url = f"https://news.google.com/rss/search?q={query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en&tbs=qdr:m6"
+        # Strict exclusion of general market/political noise
+        excluded = "-atmanirbhar -market -sensex -stocks -budget -invest -price"
+        full_query = f"{query} {excluded}"
+        url = f"https://news.google.com/rss/search?q={full_query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en&tbs=qdr:{time_range}"
         feed = feedparser.parse(url)
         return sorted(feed.entries, key=lambda x: x.published_parsed, reverse=True)[:limit]
     except: return []
 
-def format_freshness(pub_date):
+def get_freshness_label(pub_date):
     diff = datetime.utcnow() - pub_date
     if diff.days > 0: return f"{diff.days} days ago"
     hours = diff.seconds // 3600
-    return f"{hours} hrs ago" if hours > 0 else f"{(diff.seconds // 60) % 60} mins ago"
+    if hours > 0: return f"{hours} hrs ago"
+    return f"{(diff.seconds // 60) % 60} mins ago"
 
-# --- 3. DATA ACQUISITION ---
-# LEFT: Official Vault (Direct FSSAI orders for inspections/sampling)
-left_query = f"site:fssai.gov.in ({COMM_STR}) ({ENFORCEMENT_KEYWORDS} OR circular OR notification)"
-vault_data = fetch_enforcement_data(left_query)
+def detect_commodity(title):
+    for c in COMMODITIES:
+        if c.lower() in title.lower(): return c.upper()
+    return "AGRI-GEN"
 
-# RIGHT: Enforcement News (Raids, Sampling drives, Adulteration prevention)
-right_query = f"({COMM_STR}) ({ENFORCEMENT_KEYWORDS}) -atmanirbhar -market -price"
-intel_data = [e for e in fetch_enforcement_data(right_query) if "fssai.gov.in" not in e.link]
+# --- 3. DATA PULLS (FEB 2026 FOCUS) ---
+# LEFT: Official Vault (Direct FSSAI site notifications)
+left_query = f"site:fssai.gov.in ({COMM_STR}) (circular OR notification OR gazette OR order OR inspection OR sampling)"
+vault_data = fetch_surgical_data(left_query, "m6")
 
-# --- 4. PAGINATION (75 ITEMS) ---
+# RIGHT: Safety Enforcement (Inspection, Sampling, Audits, Adulteration raids)
+right_query = f"({COMM_STR}) (food safety adulteration inspection sampling audit 'quality check' 'fssai mandate' label)"
+intel_data = [e for e in fetch_surgical_data(right_query, "m6") if "fssai.gov.in" not in e.link]
+
+# --- 4. PAGINATION LOGIC (75 PER PAGE) ---
 PAGE_SIZE = 75
 if 'page' not in st.session_state: st.session_state.page = 1
 
-def get_page_items(data):
-    total = math.ceil(len(data) / PAGE_SIZE) if data else 1
-    start = (st.session_state.page - 1) * PAGE_SIZE
-    return data[start:start + PAGE_SIZE], total
+total_items = max(len(vault_data), len(intel_data))
+max_pages = math.ceil(total_items / PAGE_SIZE) if total_items > 0 else 1
 
-v_items, v_total = get_page_items(vault_data)
-i_items, i_total = get_page_items(intel_data)
-max_p = max(v_total, i_total)
+start_idx = (st.session_state.page - 1) * PAGE_SIZE
+end_idx = start_idx + PAGE_SIZE
 
-# --- 5. RENDER ---
-st.markdown("<h2 style='text-align: center; color:#c5a059;'>🛡️ AGRI-QUALITY ENFORCEMENT DECK</h2>", unsafe_allow_html=True)
+# --- 5. DASHBOARD RENDER ---
+st.markdown("<h2 style='text-align: center; color:#c5a059;'>🛡️ FSSAI ENFORCEMENT & QUALITY DECK</h2>", unsafe_allow_html=True)
 st.write("---")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    st.markdown("<h3 class='section-header'>🏛️ FSSAI SAMPLING & AUDIT ORDERS</h3>", unsafe_allow_html=True)
-    for e in v_items:
+    st.markdown("<h3 class='section-header'>🏛️ OFFICIAL FSSAI ORDERS</h3>", unsafe_allow_html=True)
+    page_vault = vault_data[start_idx:end_idx]
+    for e in page_vault:
         dt = datetime(*e.published_parsed[:6])
-        st.markdown(f"""<div class='bento-card'><div class='meta-line'>OFFICIAL | {dt.strftime('%d %b %Y')} | {format_freshness(dt)}</div>
+        st.markdown(f"""<div class='bento-card'><div class='meta-line'>{detect_commodity(e.title)} | OFFICIAL | {dt.strftime('%d %b %Y')} | {get_freshness_label(dt)}</div>
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
 with col2:
-    st.markdown("<h3 class='section-header'>⚖️ INSPECTION & PREVENTION INTEL</h3>", unsafe_allow_html=True)
-    for e in i_items:
+    st.markdown("<h3 class='section-header'>⚖️ INSPECTION & SAFETY INTEL</h3>", unsafe_allow_html=True)
+    page_intel = intel_data[start_idx:end_idx]
+    for e in page_intel:
         dt = datetime(*e.published_parsed[:6])
-        st.markdown(f"""<div class='bento-card'><div class='meta-line'>DRIVE | {dt.strftime('%d %b %Y')} | {format_freshness(dt)}</div>
+        st.markdown(f"""<div class='bento-card'><div class='meta-line'>{detect_commodity(e.title)} | ENFORCEMENT | {dt.strftime('%d %b %Y')} | {get_freshness_label(dt)}</div>
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
-# Pagination Controls
+# Pagination Footer
 st.write("---")
 p_col1, p_col2, p_col3 = st.columns([1, 1, 1])
 with p_col2:
-    st.write(f"Displaying Page {st.session_state.page} of {max_p}")
+    st.write(f"Page {st.session_state.page} of {max_pages}")
     b1, b2 = st.columns(2)
     if st.session_state.page > 1:
         if b1.button("← Previous"): st.session_state.page -= 1; st.rerun()
-    if st.session_state.page < max_p:
+    if st.session_state.page < max_pages:
         if b2.button("Next →"): st.session_state.page += 1; st.rerun()
