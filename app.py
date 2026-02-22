@@ -5,7 +5,7 @@ import pytz
 import math
 
 # --- 1. EXECUTIVE THEME: REFINED MOSS & GOLD ---
-st.set_page_config(page_title="Agri-Compliance Command Center", layout="wide")
+st.set_page_config(page_title="High-Frequency Agri-Compliance Deck", layout="wide")
 
 st.markdown("""
 <style>
@@ -20,38 +20,39 @@ st.markdown("""
     .meta-line { color: #d4af37; font-size: 11px; font-weight: 700; text-transform: uppercase; margin-bottom: 6px; letter-spacing: 1.5px; }
     .section-header { border-bottom: 3px solid #d4af37; color: #d4af37; text-align: center; text-transform: uppercase; letter-spacing: 2px; padding-bottom: 10px; }
     .sync-text { font-size: 14px; color: #d4af37; font-weight: 600; text-align: right; }
-    .stButton>button { background-color: #d4af37; color: #1a2421; font-weight: 700; border: none; width: 100%; }
+    .fresh-tag { background-color: #ff4b4b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 8px; vertical-align: middle; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- 2. SURGICAL LOGIC: PORTAL & KEYWORD LOCK ---
-# Industry-specific portals for the Right Side
+# --- 2. SURGICAL LOGIC: RECENT PULSE LOCK ---
 INDUSTRY_PORTALS = "(site:fnbnews.com OR site:agrofoodprocessing.com OR site:foodnavigator-asia.com)"
-
-# High-impact regulatory keywords
 REG_KEYWORDS = "(FSSAI OR 'FSSAI CEO' OR 'food safety' OR enforcement OR inspection OR review OR campaign OR obesity OR healthy OR 'Front-of-Pack Label' OR ban OR labelling OR measures OR efforts)"
+MACRO_BLOCKER = "-rupee -imports -volume -price -market -trade -atmanirbhar -economy -stocks -sensex -nifty"
 
-# Mandatory Blocklist for Price/Market noise
-NOISE_BLOCKER = "-rupee -spike -imports -volume -price -market -trade -atmanirbhar -economy -stocks -sensex -nifty"
-
-@st.cache_data(ttl=600)
-def fetch_compliance_intel(query, limit=150):
+@st.cache_data(ttl=60) # Reduced to 60 seconds for ultra-freshness
+def fetch_ultra_fresh_intel(query, limit=150):
     try:
-        # Strictly India-focused surgical search
-        full_query = f"{query} {NOISE_BLOCKER} location:India"
-        url = f"https://news.google.com/rss/search?q={full_query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en&tbs=qdr:m6"
+        # tbs=qdr:d ensures we prioritize the last 24 hours of activity
+        full_query = f"{query} {MACRO_BLOCKER} location:India"
+        url = f"https://news.google.com/rss/search?q={full_query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en&tbs=qdr:d"
         feed = feedparser.parse(url)
-        # Secondary logic check to kill any lingering macro-news
-        filtered = [e for e in feed.entries if not any(x in e.title.lower() for x in ["price", "market", "import", "trade", "stock"])]
+        
+        # If 24h results are low, fall back to m6 (last 6 months) to ensure the 75-item page is full
+        if len(feed.entries) < 10:
+            url = f"https://news.google.com/rss/search?q={full_query.replace(' ', '+')}&hl=en-IN&gl=IN&ceid=IN:en&tbs=qdr:m6"
+            feed = feedparser.parse(url)
+            
+        filtered = [e for e in feed.entries if not any(x in e.title.lower() for x in ["price", "market", "trade", "import"])]
         return sorted(filtered, key=lambda x: x.published_parsed, reverse=True)[:limit]
     except: return []
 
-def format_freshness(pub_date):
+def format_freshness_detailed(pub_date):
     diff = datetime.utcnow() - pub_date
-    if diff.days > 0: return f"{diff.days} days ago"
+    if diff.days > 0: return f"{diff.days}d ago", False
     hours = diff.seconds // 3600
-    if hours > 0: return f"{hours} hrs ago"
-    return f"{(diff.seconds // 60) % 60} mins ago"
+    if hours > 0: return f"{hours}h ago", (hours < 12)
+    mins = (diff.seconds // 60) % 60
+    return f"{mins}m ago", True
 
 # --- 3. PERSISTENT HEADER ---
 ist = pytz.timezone('Asia/Kolkata')
@@ -61,8 +62,8 @@ h_col1, h_col2 = st.columns([3, 1])
 with h_col1:
     st.markdown("<h2 style='color:#d4af37; margin:0;'>🛡️ AGRI-QUALITY COMMAND CENTER</h2>", unsafe_allow_html=True)
 with h_col2:
-    st.markdown(f"<div class='sync-text'>Sync: {last_sync}</div>", unsafe_allow_html=True)
-    if st.button("🔄 Force Refresh Data"):
+    st.markdown(f"<div class='sync-text'>Live Sync: {last_sync}</div>", unsafe_allow_html=True)
+    if st.button("🚀 Emergency Force Refresh"):
         st.cache_data.clear()
         st.rerun()
 st.write("---")
@@ -70,12 +71,11 @@ st.write("---")
 # --- 4. DATA ACQUISITION ---
 # LEFT SIDE: Deep Scan of FSSAI Website for all Agri/Food Advisories
 left_query = "site:fssai.gov.in (Agri OR Food OR Product OR Standards OR Advisory OR Gazette OR Order OR Notification OR Laboratory OR Sampling OR 'Section 16')"
-vault_data = fetch_compliance_intel(left_query)
+vault_data = fetch_ultra_fresh_intel(left_query)
 
 # RIGHT SIDE: Portal-Specific Intelligence (FnB News / Agrofood Processing)
-# Hunting for CEO directives, Campaigns, and Labeling Bans
 right_query = f"{INDUSTRY_PORTALS} {REG_KEYWORDS}"
-intel_data = [e for e in fetch_compliance_intel(right_query) if "fssai.gov.in" not in e.link]
+intel_data = [e for e in fetch_ultra_fresh_intel(right_query) if "fssai.gov.in" not in e.link]
 
 # --- 5. RENDER (PAGINATION: 75) ---
 PAGE_SIZE = 75
@@ -90,14 +90,18 @@ with col1:
     st.markdown("<h3 class='section-header'>🏛️ FSSAI OFFICIAL ADVISORIES</h3>", unsafe_allow_html=True)
     for e in vault_data[start:end]:
         dt = datetime(*e.published_parsed[:6])
-        st.markdown(f"""<div class='bento-card'><div class='meta-line'>OFFICIAL | {dt.strftime('%d %b %Y')} | {format_freshness(dt)}</div>
+        label, is_hot = format_freshness_detailed(dt)
+        fresh_tag = "<span class='fresh-tag'>HOT</span>" if is_hot else ""
+        st.markdown(f"""<div class='bento-card'><div class='meta-line'>OFFICIAL | {dt.strftime('%d %b %Y')} | {label} {fresh_tag}</div>
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
 with col2:
     st.markdown("<h3 class='section-header'>⚖️ INDUSTRY & ENFORCEMENT INTEL</h3>", unsafe_allow_html=True)
     for e in intel_data[start:end]:
         dt = datetime(*e.published_parsed[:6])
-        st.markdown(f"""<div class='bento-card'><div class='meta-line'>CAMPAIGN | {dt.strftime('%d %b %Y')} | {format_freshness(dt)}</div>
+        label, is_hot = format_freshness_detailed(dt)
+        fresh_tag = "<span class='fresh-tag'>HOT</span>" if is_hot else ""
+        st.markdown(f"""<div class='bento-card'><div class='meta-line'>CAMPAIGN | {dt.strftime('%d %b %Y')} | {label} {fresh_tag}</div>
         <a href='{e.link}' target='_blank' class='headline-link'>{e.title}</a></div>""", unsafe_allow_html=True)
 
 # Page Control
